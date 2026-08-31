@@ -1,4 +1,4 @@
-from bot.radio import descargar_de_youtube
+# from bot.radio import descargar_de_youtube
 import json
 import os
 import re
