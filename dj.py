@@ -36,7 +36,8 @@ class DJBot(BaseBot):
 
     async def on_start(self, session_metadata) -> None:
         """Se ejecuta cuando el bot entra con éxito a la sala pública"""
-        print(f"[DJ Bot] Bot en línea. ID de la sesión: {session_metadata.session_id}")
+        print(f"[DJ Bot] Bot en línea. ID de la sesión: {session_metadata.user_id}")
+
         # Guardamos el ID del bot para usarlo en las validaciones
         self.bot_id = session_metadata.user_id
 
