@@ -2,7 +2,7 @@ import asyncio
 import json
 import os
 import re
-from highrise import BaseBot, Position, CurrencyItem, RoomVIPStatus
+from highrise import BaseBot, Position, CurrencyItem
 from highrise.models import SessionMetadata, User
 
 # Configuración del servidor de streaming y tarifa
