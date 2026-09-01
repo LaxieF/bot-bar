@@ -23,7 +23,7 @@ async def stream_radio_broadcast():
     """Transmite en vivo continuamente lo que esté configurado en RADIO_STATE"""
     while True:
         if not RADIO_STATE["current_url"]:
-            # Si no hay música pedida, transmite silencio o una pista por defecto para no desconectar la antena
+            # Si no hay música pedida, transmite silencio para no desconectar la antena
             await asyncio.sleep(1)
             continue
             
@@ -42,7 +42,6 @@ async def stream_radio_broadcast():
         # Si termina la canción sola, limpiamos para la siguiente
         await asyncio.sleep(1)
 
-@custom_url = "/stream"
 @app.get("/stream")
 async def get_live_broadcast():
     """Esta es la URL FIJA que vas a pegar en la casilla de Highrise"""
@@ -58,7 +57,7 @@ async def change_song(q: str = Query(..., description="Cambiar canción de la an
             if not info or 'entries' not in info or len(info['entries']) == 0:
                 raise HTTPException(status_code=404, detail="No encontrada")
             
-            video_data = info['entries'][0]
+            video_data = info['entries']
             RADIO_STATE["current_url"] = video_data['url']
             RADIO_STATE["current_title"] = video_data.get('title', 'Desconocido')
             
