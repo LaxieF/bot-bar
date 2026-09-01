@@ -37,11 +37,19 @@ class DJBot(BaseBot):
             await self.agregar_a_la_cola(user, nombre_cancion)
 
     async def agregar_a_la_cola(self, user: User, nombre_cancion: str):
+        # Reemplazamos los espacios por signos más (+) para que la URL de Render funcione correctamente
+        termino_busqueda = nombre_cancion.replace(" ", "+")
+        
+        # Conectamos dinámicamente tu URL de Render con el término de búsqueda de YouTube
+        url_antena = f"https://onrender.com{termino_busqueda}"
+
         informacion_cancion = {
             "titulo": nombre_cancion.title(),
             "artista": "Artista En Vivo",
             "solicitante": user.username,
-            "duracion": "3:45","stream_url": "https://stream.zeno.fm/f3wvbb142tzuv"
+            "duracion": "3:45",
+            "stream_url": url_antena
+        }
 
         self.cola.append(informacion_cancion)
 
