@@ -18,8 +18,6 @@ class DJBot(BaseBot):
 
     async def on_start(self, session_metadata: SessionMetadata) -> None:
         print(f"[DJ Bot] Bot en línea y listo para reproducir música.")
-        # Quitamos el walk_to automático para que el bot se quede quieto donde lo dejes 
-        # y no salga corriendo a la esquina (0,0,0)
 
     async def on_tip(self, sender: User, receiver: User, tip: CurrencyItem) -> None:
         if receiver.id == (await self.highrise.get_my_user_id()):
@@ -55,13 +53,15 @@ class DJBot(BaseBot):
 
     async def reproducir_siguiente(self):
         if not self.cola:
+            # Si ya no hay más canciones, el bot frena de forma limpia y NO se sale de la sala
             self.esta_jugando = False
+            self.cancion_actual = None
             return
 
         self.esta_jugando = True
         self.cancion_actual = self.cola.pop(0)
 
-        # 1. Cambiar la música en la antena usando peticiones asíncronas seguras (No traba al bot)
+        # 1. Cambiar la música en la antena de Render
         try:
             termino = self.cancion_actual["titulo"].replace(" ", "+")
             url_cambio = f"https://onrender.com{termino}"
@@ -85,7 +85,9 @@ class DJBot(BaseBot):
         )
         await self.highrise.chat(tarjeta)
 
-        # Simula la duración y pasa a la siguiente canción
+        # Espera los 3 minutos que dura el tema antes de buscar el siguiente
         await asyncio.sleep(180)
+        
+        # Volvemos a llamar a la función de forma segura
         await self.reproducir_siguiente()
-                
+    
