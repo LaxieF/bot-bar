@@ -2,8 +2,7 @@ import asyncio
 import json
 import os
 import re
-import urllib.request
-import urllib.parse
+import aiohttp
 from highrise import BaseBot, Position, CurrencyItem
 from highrise.models import SessionMetadata, User
 
@@ -19,13 +18,10 @@ class DJBot(BaseBot):
 
     async def on_start(self, session_metadata: SessionMetadata) -> None:
         print(f"[DJ Bot] Bot en línea y listo para reproducir música.")
-        try:
-            await self.highrise.walk_to(Position(0, 0, 0))
-        except Exception as e:
-            print(f"Error al mover DJ: {e}")
+        # Quitamos el walk_to automático para que el bot se quede quieto donde lo dejes 
+        # y no salga corriendo a la esquina (0,0,0)
 
     async def on_tip(self, sender: User, receiver: User, tip: CurrencyItem) -> None:
-        # Detectar cuando le pagan Gold al DJ Bot
         if receiver.id == (await self.highrise.get_my_user_id()):
             if tip.amount >= PRECIO_DEL_ORO:
                 await self.highrise.send_whisper(
@@ -39,10 +35,7 @@ class DJBot(BaseBot):
             await self.agregar_a_la_cola(user, nombre_cancion)
 
     async def agregar_a_la_cola(self, user: User, nombre_cancion: str):
-        # Reemplazamos los espacios por signos más (+) para que la URL de Render funcione correctamente
         termino_busqueda = nombre_cancion.replace(" ", "+")
-        
-        # Conectamos dinámicamente tu URL de Render con el término de búsqueda de YouTube
         url_antena = f"https://onrender.com{termino_busqueda}"
 
         informacion_cancion = {
@@ -68,15 +61,15 @@ class DJBot(BaseBot):
         self.esta_jugando = True
         self.cancion_actual = self.cola.pop(0)
 
-        # 1. Le ordenamos a tu servidor de Render que cambie la canción en la antena fija
+        # 1. Cambiar la música en la antena usando peticiones asíncronas seguras (No traba al bot)
         try:
             termino = self.cancion_actual["titulo"].replace(" ", "+")
             url_cambio = f"https://onrender.com{termino}"
             
-            # Hacemos la petición en segundo plano de forma limpia
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, lambda: urllib.request.urlopen(url_cambio).read())
-            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url_cambio) as response:
+                    await response.json()
+                    
         except Exception as e:
             print(f"Error al cambiar la música en la antena: {e}")
 
@@ -95,4 +88,4 @@ class DJBot(BaseBot):
         # Simula la duración y pasa a la siguiente canción
         await asyncio.sleep(180)
         await self.reproducir_siguiente()
-        
+                
