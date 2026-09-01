@@ -39,17 +39,16 @@ async def stream_radio_broadcast():
                 break
             yield chunk
             
-        # Si termina la canción sola, limpiamos para la siguiente
         await asyncio.sleep(1)
 
-@app.get("/stream")
+# CAMBIO CLAVE: Ahora la música sale directo en "/" (la raíz que busca Highrise)
+@app.get("/")
 async def get_live_broadcast():
-    """Esta es la URL FIJA que vas a pegar en la casilla de Highrise"""
+    """Esta es la URL que el juego lee de forma nativa"""
     return StreamingResponse(stream_radio_broadcast(), media_type="audio/mpeg")
 
 @app.get("/change_song")
 async def change_song(q: str = Query(..., description="Cambiar canción de la antena")):
-    """Esta URL la usará tu bot internamente para cambiar la música de la antena"""
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             loop = asyncio.get_event_loop()
@@ -64,3 +63,4 @@ async def change_song(q: str = Query(..., description="Cambiar canción de la an
         return {"status": "success", "playing": RADIO_STATE["current_title"]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+        
