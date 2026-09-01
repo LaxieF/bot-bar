@@ -41,9 +41,8 @@ class DJBot(BaseBot):
             "titulo": nombre_cancion.title(),
             "artista": "Artista En Vivo",
             "solicitante": user.username,
-            "duracion": "3:45",
-            "stream_url": f"https://api.mixstream.live/stream?q={nombre_cancion}"
-        }
+            "duracion": "3:45","stream_url": "https://stream.zeno.fm/f3wvbb142tzuv"
+
         self.cola.append(informacion_cancion)
 
         if not self.esta_jugando:
