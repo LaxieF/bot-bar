@@ -1,5 +1,5 @@
 import asyncio
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse, Response
 import yt_dlp
 
@@ -41,9 +41,10 @@ async def stream_radio_broadcast():
             
         await asyncio.sleep(1)
 
-# CORRECCIÓN PARA HIGHRISE: Acepta GET (para audio) y HEAD (para la verificación del juego)
-@app.route("/", methods=["GET", "HEAD"])
-async def get_live_broadcast(request):
+# CORRECCIÓN NATIVA PARA FASTAPI: Acepta GET y HEAD de forma correcta
+@app.get("/")
+@app.head("/")
+async def get_live_broadcast(request: Request):
     # Si Highrise solo está verificando que la URL existe (HEAD), respondemos con un OK vacío
     if request.method == "HEAD":
         return Response(status_code=200, media_type="audio/mpeg")
@@ -66,4 +67,4 @@ async def change_song(q: str = Query(..., description="Cambiar canción de la an
         return {"status": "success", "playing": RADIO_STATE["current_title"]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+        
