@@ -36,7 +36,6 @@ class DJBot(BaseBot):
         await self.highrise.chat(f"🔎 Buscando '{nombre_cancion}'...")
 
         try:
-            # Petición HTTP con timeout extendido
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     f"{MUSIC_API_URL}/play", 
@@ -47,13 +46,19 @@ class DJBot(BaseBot):
                     if response.status == 200:
                         data = await response.json()
                         
-                        duracion_seg = data.get("duration", 180) or 180
+                        # Manejo seguro de la duración
+                        raw_dur = data.get("duration")
+                        try:
+                            duracion_seg = int(raw_dur) if raw_dur is not None else 180
+                        except (ValueError, TypeError):
+                            duracion_seg = 180
+
                         minutos = duracion_seg // 60
                         segundos = duracion_seg % 60
                         duracion_str = f"{minutos}:{segundos:02d}"
 
                         informacion_cancion = {
-                            "titulo": data.get("title", nombre_cancion.title()),
+                            "titulo": str(data.get("title") or nombre_cancion.title()),
                             "solicitante": user.username,
                             "solicitante_id": user.id,
                             "duracion": duracion_str,
@@ -74,7 +79,7 @@ class DJBot(BaseBot):
             await self.highrise.chat("⚠️ El servidor tardó demasiado en responder.")
         except Exception as e:
             print(f"Error en dj.py: {e}")
-            await self.highrise.chat("❌ Error al procesar la solicitud.")
+            await self.highrise.chat("❌ Error al procesar la respuesta.")
 
     async def reproducir_siguiente(self):
         if not self.cola:
@@ -96,18 +101,13 @@ class DJBot(BaseBot):
         )
         await self.highrise.chat(tarjeta)
 
-        # Susurro privado con el enlace directo
+        # Envío privado del enlace de audio
         link_audio = self.cancion_actual.get("stream_url")
         if link_audio:
             try:
                 await self.highrise.send_whisper(
                     self.cancion_actual["solicitante_id"],
-                    "🔗 Enlace para la radio:"
-                )
-                await asyncio.sleep(0.5)
-                await self.highrise.send_whisper(
-                    self.cancion_actual["solicitante_id"],
-                    link_audio
+                    f"🔗 Enlace para la radio:\n{link_audio}"
                 )
             except Exception as w_err:
                 print(f"Error enviando susurro: {w_err}")
@@ -116,4 +116,4 @@ class DJBot(BaseBot):
         await asyncio.sleep(tiempo_espera)
         
         await self.reproducir_siguiente()
-                
+        
