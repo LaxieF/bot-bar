@@ -1,13 +1,11 @@
 import asyncio
 import json
 import os
-import re
 import aiohttp
 from highrise import BaseBot, Position, CurrencyItem
 from highrise.models import SessionMetadata, User
 
-# Configuración del servidor de streaming y tarifa
-PRECIO_DEL_ORO = 5  # Cantidad de oro requerida para pedir canción
+PRECIO_DEL_ORO = 5  
 MUSIC_API_URL = "https://highrise-music-server.onrender.com"
 
 class DJBot(BaseBot):
@@ -18,14 +16,15 @@ class DJBot(BaseBot):
         self.cancion_actual = None
 
     async def on_start(self, session_metadata: SessionMetadata) -> None:
-        print(f"[DJ Bot] Bot en línea y listo para reproducir música.")
+        print("[DJ Bot] Bot activo y listo.")
 
     async def on_tip(self, sender: User, receiver: User, tip: CurrencyItem) -> None:
-        if receiver.id == (await self.highrise.get_my_user_id()):
+        bot_id = await self.highrise.get_my_user_id()
+        if receiver.id == bot_id:
             if tip.amount >= PRECIO_DEL_ORO:
                 await self.highrise.send_whisper(
                     sender.id,
-                    f"🎵 ¡Gracias por los {tip.amount} Gold! Usa !play <nombre de canción> para pedir tu tema."
+                    f"🎵 ¡Gracias por las {tip.amount} monedas! Usa !play <canción> para pedir tu tema."
                 )
 
     async def on_chat(self, user: User, message: str) -> None:
@@ -37,9 +36,14 @@ class DJBot(BaseBot):
         await self.highrise.chat(f"🔎 Buscando '{nombre_cancion}'...")
 
         try:
-            # Consultamos la API de Render para obtener los datos y el link directo de audio
+            # Petición HTTP con timeout extendido
             async with aiohttp.ClientSession() as session:
-                async with session.post(f"{MUSIC_API_URL}/play", json={"query": nombre_cancion}, timeout=120) as response:
+                async with session.post(
+                    f"{MUSIC_API_URL}/play", 
+                    json={"query": nombre_cancion}, 
+                    timeout=aiohttp.ClientTimeout(total=120)
+                ) as response:
+                    
                     if response.status == 200:
                         data = await response.json()
                         
@@ -64,10 +68,13 @@ class DJBot(BaseBot):
                         else:
                             await self.highrise.chat(f"🎵 '{informacion_cancion['titulo']}' agregada a la cola.")
                     else:
-                        await self.highrise.chat("❌ No encontré esa canción en YouTube.")
+                        await self.highrise.chat("❌ No encontré esa canción.")
+
+        except asyncio.TimeoutError:
+            await self.highrise.chat("⚠️ El servidor tardó demasiado en responder.")
         except Exception as e:
-            print(f"Error al conectar con la API de música: {e}")
-            await self.highrise.chat("⚠️ El servidor de música no respondió a tiempo.")
+            print(f"Error en dj.py: {e}")
+            await self.highrise.chat("❌ Error al procesar la solicitud.")
 
     async def reproducir_siguiente(self):
         if not self.cola:
@@ -78,28 +85,35 @@ class DJBot(BaseBot):
         self.esta_jugando = True
         self.cancion_actual = self.cola.pop(0)
 
-        # 1. Anuncio en el chat público
+        # Anuncio público en la sala
         tarjeta = (
             f"\n🟣 ────────────────────── 🟣\n"
-            f"🎶 PREPARANDO CANCIÓN 🎶\n"
+            f"🎶 REPRODUCIENDO AHORA 🎶\n"
             f"📌 Título: {self.cancion_actual['titulo']}\n"
-            f"👤 Solicitante: {self.cancion_actual['solicitante']}\n"
+            f"👤 Pedida por: {self.cancion_actual['solicitante']}\n"
             f"⏱️ Duración: {self.cancion_actual['duracion']}\n"
             f"🟣 ────────────────────── 🟣"
         )
         await self.highrise.chat(tarjeta)
 
-        # 2. Te envía la URL directamente por susurro (whisper) a quien pidió la canción para ponerla en la radio
+        # Susurro privado con el enlace directo
         link_audio = self.cancion_actual.get("stream_url")
         if link_audio:
-            await self.highrise.send_whisper(
-                self.cancion_actual["solicitante_id"],
-                f"🔗 Copia este enlace para la radio:\n{link_audio}"
-            )
+            try:
+                await self.highrise.send_whisper(
+                    self.cancion_actual["solicitante_id"],
+                    "🔗 Enlace para la radio:"
+                )
+                await asyncio.sleep(0.5)
+                await self.highrise.send_whisper(
+                    self.cancion_actual["solicitante_id"],
+                    link_audio
+                )
+            except Exception as w_err:
+                print(f"Error enviando susurro: {w_err}")
 
-        # Espera el tiempo de la canción antes de procesar la siguiente en la cola
         tiempo_espera = self.cancion_actual.get("duracion_seg", 180)
         await asyncio.sleep(tiempo_espera)
         
         await self.reproducir_siguiente()
-        
+                
