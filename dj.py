@@ -37,13 +37,12 @@ class DJBot(BaseBot):
         await self.highrise.chat(f"🔎 Buscando '{nombre_cancion}'...")
 
         try:
-            # Consultamos la API de Render para obtener los datos de la canción
+            # Consultamos la API de Render para obtener los datos y el link directo de audio
             async with aiohttp.ClientSession() as session:
                 async with session.post(f"{MUSIC_API_URL}/play", json={"query": nombre_cancion}, timeout=15) as response:
                     if response.status == 200:
                         data = await response.json()
                         
-                        # Formateamos la duración
                         duracion_seg = data.get("duration", 180) or 180
                         minutos = duracion_seg // 60
                         segundos = duracion_seg % 60
@@ -52,6 +51,7 @@ class DJBot(BaseBot):
                         informacion_cancion = {
                             "titulo": data.get("title", nombre_cancion.title()),
                             "solicitante": user.username,
+                            "solicitante_id": user.id,
                             "duracion": duracion_str,
                             "duracion_seg": duracion_seg,
                             "stream_url": data.get("stream_url")
@@ -71,7 +71,6 @@ class DJBot(BaseBot):
 
     async def reproducir_siguiente(self):
         if not self.cola:
-            # Si ya no hay más canciones, el bot frena de forma limpia
             self.esta_jugando = False
             self.cancion_actual = None
             return
@@ -79,10 +78,10 @@ class DJBot(BaseBot):
         self.esta_jugando = True
         self.cancion_actual = self.cola.pop(0)
 
-        # 1. Dibujar la tarjeta visual morada en el chat
+        # 1. Anuncio en el chat público
         tarjeta = (
             f"\n🟣 ────────────────────── 🟣\n"
-            f"🎶 SONANDO AHORA 🎶\n"
+            f"🎶 PREPARANDO CANCIÓN 🎶\n"
             f"📌 Título: {self.cancion_actual['titulo']}\n"
             f"👤 Solicitante: {self.cancion_actual['solicitante']}\n"
             f"⏱️ Duración: {self.cancion_actual['duracion']}\n"
@@ -90,10 +89,17 @@ class DJBot(BaseBot):
         )
         await self.highrise.chat(tarjeta)
 
-        # Espera el tiempo real de la canción antes de pasar a la siguiente
+        # 2. Te envía la URL directamente por susurro (whisper) a quien pidió la canción para ponerla en la radio
+        link_audio = self.cancion_actual.get("stream_url")
+        if link_audio:
+            await self.highrise.send_whisper(
+                self.cancion_actual["solicitante_id"],
+                f"🔗 Copia este enlace para la radio:\n{link_audio}"
+            )
+
+        # Espera el tiempo de la canción antes de procesar la siguiente en la cola
         tiempo_espera = self.cancion_actual.get("duracion_seg", 180)
         await asyncio.sleep(tiempo_espera)
         
-        # Siguiente tema
         await self.reproducir_siguiente()
         
