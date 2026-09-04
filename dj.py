@@ -8,6 +8,7 @@ from highrise.models import SessionMetadata, User
 
 # Configuración del servidor de streaming y tarifa
 PRECIO_DEL_ORO = 5  # Cantidad de oro requerida para pedir canción
+MUSIC_API_URL = "https://highrise-music-server.onrender.com"
 
 class DJBot(BaseBot):
     def __init__(self):
@@ -33,27 +34,44 @@ class DJBot(BaseBot):
             await self.agregar_a_la_cola(user, nombre_cancion)
 
     async def agregar_a_la_cola(self, user: User, nombre_cancion: str):
-        termino_busqueda = nombre_cancion.replace(" ", "+")
-        url_antena = f"https://onrender.com{termino_busqueda}"
+        await self.highrise.chat(f"🔎 Buscando '{nombre_cancion}'...")
 
-        informacion_cancion = {
-            "titulo": nombre_cancion.title(),
-            "artista": "Artista En Vivo",
-            "solicitante": user.username,
-            "duracion": "3:45",
-            "stream_url": url_antena
-        }
+        try:
+            # Consultamos la API de Render para obtener los datos de la canción
+            async with aiohttp.ClientSession() as session:
+                async with session.post(f"{MUSIC_API_URL}/play", json={"query": nombre_cancion}, timeout=15) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        
+                        # Formateamos la duración
+                        duracion_seg = data.get("duration", 180) or 180
+                        minutos = duracion_seg // 60
+                        segundos = duracion_seg % 60
+                        duracion_str = f"{minutos}:{segundos:02d}"
 
-        self.cola.append(informacion_cancion)
+                        informacion_cancion = {
+                            "titulo": data.get("title", nombre_cancion.title()),
+                            "solicitante": user.username,
+                            "duracion": duracion_str,
+                            "duracion_seg": duracion_seg,
+                            "stream_url": data.get("stream_url")
+                        }
 
-        if not self.esta_jugando:
-            await self.reproducir_siguiente()
-        else:
-            await self.highrise.chat(f"🎵 '{nombre_cancion}' agregada a la cola.")
+                        self.cola.append(informacion_cancion)
+
+                        if not self.esta_jugando:
+                            await self.reproducir_siguiente()
+                        else:
+                            await self.highrise.chat(f"🎵 '{informacion_cancion['titulo']}' agregada a la cola.")
+                    else:
+                        await self.highrise.chat("❌ No encontré esa canción en YouTube.")
+        except Exception as e:
+            print(f"Error al conectar con la API de música: {e}")
+            await self.highrise.chat("⚠️ El servidor de música no respondió a tiempo.")
 
     async def reproducir_siguiente(self):
         if not self.cola:
-            # Si ya no hay más canciones, el bot frena de forma limpia y NO se sale de la sala
+            # Si ya no hay más canciones, el bot frena de forma limpia
             self.esta_jugando = False
             self.cancion_actual = None
             return
@@ -61,33 +79,21 @@ class DJBot(BaseBot):
         self.esta_jugando = True
         self.cancion_actual = self.cola.pop(0)
 
-        # 1. Cambiar la música en la antena de Render
-        try:
-            termino = self.cancion_actual["titulo"].replace(" ", "+")
-            url_cambio = f"https://onrender.com{termino}"
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url_cambio) as response:
-                    await response.json()
-                    
-        except Exception as e:
-            print(f"Error al cambiar la música en la antena: {e}")
-
-        # 2. Dibujar la tarjeta visual morada en el chat
+        # 1. Dibujar la tarjeta visual morada en el chat
         tarjeta = (
             f"\n🟣 ────────────────────── 🟣\n"
             f"🎶 SONANDO AHORA 🎶\n"
             f"📌 Título: {self.cancion_actual['titulo']}\n"
-            f"🎙️ Artista: {self.cancion_actual['artista']}\n"
             f"👤 Solicitante: {self.cancion_actual['solicitante']}\n"
-            f"⏱️ Progreso: [0=================] 0:05 / {self.cancion_actual['duracion']}\n"
+            f"⏱️ Duración: {self.cancion_actual['duracion']}\n"
             f"🟣 ────────────────────── 🟣"
         )
         await self.highrise.chat(tarjeta)
 
-        # Espera los 3 minutos que dura el tema antes de buscar el siguiente
-        await asyncio.sleep(180)
+        # Espera el tiempo real de la canción antes de pasar a la siguiente
+        tiempo_espera = self.cancion_actual.get("duracion_seg", 180)
+        await asyncio.sleep(tiempo_espera)
         
-        # Volvemos a llamar a la función de forma segura
+        # Siguiente tema
         await self.reproducir_siguiente()
-    
+        
