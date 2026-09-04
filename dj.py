@@ -39,7 +39,7 @@ class DJBot(BaseBot):
         try:
             # Consultamos la API de Render para obtener los datos y el link directo de audio
             async with aiohttp.ClientSession() as session:
-                async with session.post(f"{MUSIC_API_URL}/play", json={"query": nombre_cancion}, timeout=60) as response:
+                async with session.post(f"{MUSIC_API_URL}/play", json={"query": nombre_cancion}, timeout=120) as response:
                     if response.status == 200:
                         data = await response.json()
                         
