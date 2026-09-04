@@ -18,15 +18,6 @@ class DJBot(BaseBot):
     async def on_start(self, session_metadata: SessionMetadata) -> None:
         print("[DJ Bot] Bot activo y listo.")
 
-    async def on_tip(self, sender: User, receiver: User, tip: CurrencyItem) -> None:
-        bot_id = await self.highrise.get_my_user_id()
-        if receiver.id == bot_id:
-            if tip.amount >= PRECIO_DEL_ORO:
-                await self.highrise.send_whisper(
-                    sender.id,
-                    f"🎵 ¡Gracias por las {tip.amount} monedas! Usa !play <canción> para pedir tu tema."
-                )
-
     async def on_chat(self, user: User, message: str) -> None:
         if message.lower().startswith("!play "):
             nombre_cancion = message[6:].strip()
@@ -74,8 +65,6 @@ class DJBot(BaseBot):
                     else:
                         await self.highrise.chat("❌ No encontré esa canción.")
 
-        except asyncio.TimeoutError:
-            await self.highrise.chat("⚠️ El servidor tardó demasiado en responder.")
         except Exception as e:
             print(f"Error en dj.py: {e}")
             await self.highrise.chat("❌ Error al procesar la respuesta.")
@@ -89,7 +78,6 @@ class DJBot(BaseBot):
         self.esta_jugando = True
         self.cancion_actual = self.cola.pop(0)
 
-        # Anuncio público
         tarjeta = (
             f"🎶 REPRODUCIENDO AHORA 🎶\n"
             f"📌 Título: {self.cancion_actual['titulo']}\n"
@@ -98,19 +86,17 @@ class DJBot(BaseBot):
         )
         await self.highrise.chat(tarjeta)
 
-        # Enlace directo de audio para la radio
         link_audio = self.cancion_actual.get("stream_url")
         if link_audio:
             try:
                 await self.highrise.send_whisper(
                     self.cancion_actual["solicitante_id"],
-                    f"🔗 Enlace para la radio:\n{link_audio}"
+                    f"🔗 Enlace de audio:\n{link_audio}"
                 )
             except Exception as w_err:
                 print(f"Error enviando susurro: {w_err}")
 
         tiempo_espera = self.cancion_actual.get("duracion_seg", 180)
         await asyncio.sleep(tiempo_espera)
-        
         await self.reproducir_siguiente()
-                        
+                
