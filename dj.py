@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import urllib.parse
 import aiohttp
 from highrise import BaseBot, Position, CurrencyItem
 from highrise.models import SessionMetadata, User
@@ -46,7 +47,6 @@ class DJBot(BaseBot):
                     if response.status == 200:
                         data = await response.json()
                         
-                        # Manejo seguro de la duración
                         raw_dur = data.get("duration")
                         try:
                             duracion_seg = int(raw_dur) if raw_dur is not None else 180
@@ -57,13 +57,17 @@ class DJBot(BaseBot):
                         segundos = duracion_seg % 60
                         duracion_str = f"{minutos}:{segundos:02d}"
 
+                        # Enlace corto y limpio para la radio
+                        encoded_query = urllib.parse.quote(nombre_cancion)
+                        short_stream_url = f"{MUSIC_API_URL}/stream?query={encoded_query}"
+
                         informacion_cancion = {
                             "titulo": str(data.get("title") or nombre_cancion.title()),
                             "solicitante": user.username,
                             "solicitante_id": user.id,
                             "duracion": duracion_str,
                             "duracion_seg": duracion_seg,
-                            "stream_url": data.get("stream_url")
+                            "stream_url": short_stream_url
                         }
 
                         self.cola.append(informacion_cancion)
@@ -101,13 +105,13 @@ class DJBot(BaseBot):
         )
         await self.highrise.chat(tarjeta)
 
-        # Envío privado del enlace de audio
+        # Susurro con enlace corto y limpio
         link_audio = self.cancion_actual.get("stream_url")
         if link_audio:
             try:
                 await self.highrise.send_whisper(
                     self.cancion_actual["solicitante_id"],
-                    f"🔗 Enlace para la radio:\n{link_audio}"
+                    f"🔗 Enlace corto para la radio:\n{link_audio}"
                 )
             except Exception as w_err:
                 print(f"Error enviando susurro: {w_err}")
@@ -116,4 +120,4 @@ class DJBot(BaseBot):
         await asyncio.sleep(tiempo_espera)
         
         await self.reproducir_siguiente()
-        
+                    
