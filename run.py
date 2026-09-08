@@ -16,14 +16,19 @@ def run_http_server():
     server = HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler)
     server.serve_forever()
 
+# Iniciar servidor HTTP en un hilo
 threading.Thread(target=run_http_server, daemon=True).start()
 
-print("Iniciando Bot DJ (Música)...")
-subprocess.Popen([sys.executable, "dj.py"])
+# Forzar a Python a no usar buffer (-u) para ver los prints e iniciar directo
+print("--- INICIANDO BOTS EN HIGHRISE ---", flush=True)
 
-print("Iniciando Bot Principal (Barra/Moderación)...")
-subprocess.Popen([sys.executable, "main.py"])
+p1 = subprocess.Popen([sys.executable, "-u", "dj.py"])
+p2 = subprocess.Popen([sys.executable, "-u", "main.py"])
 
-while True:
-    time.sleep(60)
+# Esperar a que los procesos se mantengan vivos
+try:
+    p1.wait()
+    p2.wait()
+except Exception as e:
+    print(f"Error en ejecucion: {e}", flush=True)
     
