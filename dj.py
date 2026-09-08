@@ -1,5 +1,5 @@
 import os
-from highrise import BaseBot, Position, run
+from highrise import BaseBot, Position
 
 class DJBot(BaseBot):
     def __init__(self):
