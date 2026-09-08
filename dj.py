@@ -30,7 +30,7 @@ class MusicBot(BaseBot):
         # Diccionario para controlar los créditos de los jugadores que pagan
         self.creditos_musica = {}
         # IMPORTANTE: Pon aquí el ID exacto de la cuenta de tu Bot DJ
-        self.bot_dj_id = "TU_BOT_DJ_ID_REAL" 
+        self.bot_dj_id = "6629a5c5e691bf441ec9c929" 
         # Precio de la canción en Gold
         self.precio_cancion = 5 
 
