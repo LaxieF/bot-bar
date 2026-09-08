@@ -1,27 +1,14 @@
-import multiprocessing
-import os
 import subprocess
+import time
+import sys
 
-def arrancar_bot_principal():
-    # Render ejecutará tu archivo de moderación principal
-    print("Iniciando Bot Principal (Barra/Moderación)...")
-    subprocess.run(["python", "main.py"])
+print("Iniciando Bot DJ (Música)...")
+subprocess.Popen([sys.executable, "dj.py"])
 
-def arrancar_bot_dj():
-    # Render ejecutará tu archivo de música en paralelo
-    print("Iniciando Bot DJ (Música)...")
-    subprocess.run(["python", "dj.py"])
+print("Iniciando Bot Principal (Barra/Moderación)...")
+subprocess.Popen([sys.executable, "main.py"])
 
-if __name__ == "__main__":
-    # Creamos dos procesos independientes para que corran juntos
-    proceso_principal = multiprocessing.Process(target=arrancar_bot_principal)
-    proceso_dj = multiprocessing.Process(target=arrancar_bot_dj)
+# Mantiene el proceso vivo para que Render no se apague
+while True:
+    time.sleep(60)
     
-    # Arrancamos ambos
-    proceso_principal.start()
-    proceso_dj.start()
-    
-    # Los mantenemos vivos compartiendo el mismo servicio de Render
-    proceso_principal.join()
-    proceso_dj.join()
-  
