@@ -1,2 +1,2 @@
 highrise-bot-sdk
-gunicorn
+requests
