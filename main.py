@@ -1,5 +1,8 @@
 from highrise import BaseBot, Position, User, CurrencyItem
 import asyncio
+import sys
+import os
+import time
 
 # --- REPOSITORIO DE EMOTES ---
 ALL_EMOTES = [
@@ -98,6 +101,11 @@ class AXIBot(BaseBot):
         is_owner = username_lower == self.owner.lower()
         is_admin = is_owner or username_lower in [a.lower() for a in self.admins]
 
+        # --- REINICIO MANUAL DESDE EL CHAT ---
+        if msg in ["!restart", "!reiniciar"] and is_owner:
+            await self.highrise.chat("🔄 Reiniciando el bot, regreso en unos segundos...")
+            os.execv(sys.executable, ['python'] + sys.argv)
+
         # --- MENÚ PRINCIPAL EN COLORES ---
         if msg in ["!ayuda", "!help", "/help"]:
             menu = (
@@ -153,7 +161,8 @@ class AXIBot(BaseBot):
                     "• !admin @user | !vip @user\n"
                     "• !admins | !vips\n"
                     "• !flash\n"
-                    "• !autotip"
+                    "• !autotip\n"
+                    "• !restart"
                 )
                 await self.highrise.send_whisper(user.id, text)
             else:
@@ -192,22 +201,38 @@ class AXIBot(BaseBot):
             await self.start_emote_loop(user.id, msg[1:])
             return
 
-        # --- REACCIONES ---
-        if msg.startswith("!heart ") and len(args) > 1:
-            await self.highrise.send_emote("emote-lust", user.id)
-            await self.highrise.chat(f"❤️ @{user.username} le manda un corazón a {args[1]}")
+        # --- REACCIONES PROTEGIDAS CONTRA CAÍDAS ---
+        if msg.startswith("!heart"):
+            target = args[1] if len(args) > 1 else f"@{user.username}"
+            try:
+                await self.highrise.send_emote("emote-kiss", user.id)
+                await self.highrise.chat(f"❤️ @{user.username} le manda un corazón a {target}")
+            except Exception as e:
+                print(f"Error emote: {e}")
 
-        elif msg.startswith("!hug ") and len(args) > 1:
-            await self.highrise.send_emote("emote-hug", user.id)
-            await self.highrise.chat(f"🤗 @{user.username} le da un abrazo a {args[1]}")
+        elif msg.startswith("!hug"):
+            target = args[1] if len(args) > 1 else f"@{user.username}"
+            try:
+                await self.highrise.send_emote("emote-pose1", user.id)
+                await self.highrise.chat(f"🤗 @{user.username} le da un abrazo a {target}")
+            except Exception as e:
+                print(f"Error emote: {e}")
 
-        elif msg.startswith("!wink ") and len(args) > 1:
-            await self.highrise.send_emote("emote-pose1", user.id)
-            await self.highrise.chat(f"😉 @{user.username} le guiña el ojo a {args[1]}")
+        elif msg.startswith("!wink"):
+            target = args[1] if len(args) > 1 else f"@{user.username}"
+            try:
+                await self.highrise.send_emote("emote-shy", user.id)
+                await self.highrise.chat(f"😉 @{user.username} le guiña el ojo a {target}")
+            except Exception as e:
+                print(f"Error emote: {e}")
 
-        elif msg.startswith("!clap ") and len(args) > 1:
-            await self.highrise.send_emote("emote-celebration", user.id)
-            await self.highrise.chat(f"👏 @{user.username} le aplaude a {args[1]}")
+        elif msg.startswith("!clap"):
+            target = args[1] if len(args) > 1 else f"@{user.username}"
+            try:
+                await self.highrise.send_emote("emote-celebration", user.id)
+                await self.highrise.chat(f"👏 @{user.username} le aplaude a {target}")
+            except Exception as e:
+                print(f"Error emote: {e}")
 
         # --- TELEPORTS ---
         if msg.startswith("!") and msg[1:] in self.locations:
@@ -350,3 +375,17 @@ class AXIBot(BaseBot):
                 await asyncio.sleep(9)
         except asyncio.CancelledError:
             pass
+
+# --- AUTO-RECONEXIÓN AUTOMÁTICA AL FINAL DEL ARCHIVO ---
+if __name__ == "__main__":
+    from highrise.__main__ import main
+    
+    while True:
+        try:
+            print("🤖 Iniciando servicio del bot AXIBot...")
+            main()
+        except Exception as e:
+            print(f"⚠️ El bot fue desconectado. Error: {e}")
+            print("🔄 Reintentando reconexión automática en 5 segundos...")
+            time.sleep(5)
+        
