@@ -428,4 +428,67 @@ class AXIBot(BaseBot):
                 self.welcome_message = " ".join(args[1:])
                 await self.highrise.chat("✅ Bienvenida actualizada.")
             elif msg == "!resetwelcome":
-                self.
+                self.welcome_message = "Bienvenido/a a la sala."
+                await self.highrise.chat("✅ Bienvenida reseteada.")
+            elif msg.startswith("!setpromotext ") and len(args) > 1:
+                self.promo_message = " ".join(args[1:])
+                await self.highrise.chat("✅ Anuncio actualizado.")
+            elif msg == "!resetpromo":
+                self.promo_message = ""
+                await self.highrise.chat("✅ Anuncio vaciado.")
+            elif msg.startswith("!setpromotime ") and len(args) > 1 and args[1].isdigit():
+                minutes = int(args[1])
+                self.promo_interval = max(60, minutes * 60)
+                await self.highrise.chat(f"⏰ Anuncio cada {minutes} min.")
+
+        # --- GESTIÓN VIP MANUAL ---
+        if is_admin:
+            if msg.startswith("!vip ") and len(args) > 1 and args[1] not in ["admin", "tp"]:
+                target = args[1].replace("@", "")
+                if target in self.vips:
+                    self.vips.remove(target)
+                    await self.highrise.chat(f"❌ @{target} ya no es VIP.")
+                else:
+                    self.vips.append(target)
+                    await self.highrise.chat(f"💎 @{target} ahora es VIP.")
+
+            elif msg == "!vips":
+                await self.highrise.send_whisper(user.id, f"📋 VIPs: {', '.join(self.vips) if self.vips else 'Ninguno'}")
+
+        # --- BUCLADOR DE EMOTES ---
+        if msg in ["!stop", "!stopdance"]:
+            if user.id in self.active_loops:
+                self.active_loops[user.id].cancel()
+                del self.active_loops[user.id]
+            await self.highrise.send_emote("idle-sleep", user.id)
+            return
+
+        if msg.isdigit():
+            num = int(msg)
+            if 1 <= num <= len(ALL_EMOTES):
+                await self.start_emote_loop(user.id, ALL_EMOTES[num - 1])
+                return
+
+    async def start_emote_loop(self, user_id: str, emote_id: str):
+        if user_id in self.active_loops:
+            self.active_loops[user_id].cancel()
+        task = asyncio.create_task(self.run_loop(user_id, emote_id))
+        self.active_loops[user_id] = task
+
+    async def run_loop(self, user_id: str, emote_id: str):
+        try:
+            while True:
+                await self.highrise.send_emote(emote_id, user_id)
+                await asyncio.sleep(9)
+        except asyncio.CancelledError:
+            pass
+
+if __name__ == "__main__":
+    from highrise.__main__ import main
+    while True:
+        try:
+            print("🤖 Servicio DJBot iniciado...")
+            main()
+        except Exception as e:
+            print(f"⚠️ Error de conexión: {e}")
+            time.sleep(5)
