@@ -141,7 +141,7 @@ class AXIBot(BaseBot):
                 await self.highrise.send_whisper(user.id, "⛔ Zona VIP restringida. Compra VIP enviando 500g al bot.")
                 return
 
-        # Flash TP sólo en cambios verticales (eje Y) - Corrección de error asignando a diccionario
+        # Flash TP sólo en cambios verticales (eje Y)
         if self.flash_enabled:
             last_y = self.user_last_y.get(user.id, pos.y)
             if abs(pos.y - last_y) > 1.5:
@@ -309,8 +309,7 @@ class AXIBot(BaseBot):
                 except Exception as e:
                     print(f"Error en reacción {cmd}: {e}")
 
-        # --- NUEVOS COMANDOS DE AVANZADOS DE TELETRANSPORTE ---
-        # 1. Traer al Bot a tu posición (!tpbot)
+        # --- NUEVOS COMANDOS AVANZADOS DE TELETRANSPORTE ---
         if msg in ["!tpbot", "!comebot"] and is_admin:
             room_users = (await self.highrise.get_room_users()).content
             for u, pos in room_users:
@@ -320,7 +319,6 @@ class AXIBot(BaseBot):
                     break
             return
 
-        # 2. Traer a un usuario hacia ti (!summon @user o !bring @user)
         if msg.startswith(("!summon ", "!bring ")) and is_admin and len(args) > 1:
             target_search = args[1].replace("@", "").lower()
             room_users = (await self.highrise.get_room_users()).content
@@ -338,7 +336,6 @@ class AXIBot(BaseBot):
                 await self.highrise.chat(f"✨ @{target_user.username} fue teletransportado hacia @{user.username}")
             return
 
-        # 3. Ir hacia la posición de un usuario (!goto @user)
         if msg.startswith("!goto ") and is_admin and len(args) > 1:
             target_search = args[1].replace("@", "").lower()
             room_users = (await self.highrise.get_room_users()).content
@@ -425,7 +422,98 @@ class AXIBot(BaseBot):
                 target_user_id = user.id
                 target_username = user.username
 
-                # Si se especifica un usuario ej: !bar @pedro (Solo Admins)
                 if len(args) > 1 and is_admin:
                     target_search = args[1].replace("@", "").lower()
-                    room_users = (await self.h
+                    room_users = (await self.highrise.get_room_users()).content
+                    for u, _ in room_users:
+                        if u.username.lower() == target_search:
+                            target_user_id = u.id
+                            target_username = u.username
+                            break
+
+                is_target_vip = (target_username.lower() == self.owner.lower()) or \
+                                (target_username.lower() in [a.lower() for a in self.admins]) or \
+                                (target_username.lower() in [v.lower() for v in self.vips])
+
+                if cmd_name == "vip" and not is_target_vip:
+                    await self.highrise.send_whisper(user.id, f"⛔ @{target_username} no tiene acceso VIP.")
+                    return
+
+                loc = self.locations[cmd_name]
+                try:
+                    await self.highrise.teleport(target_user_id, Position(loc['x'], loc['y'], loc['z']))
+                except Exception as e:
+                    print(f"Error TP: {e}")
+
+        # --- COMANDOS DE MENSAJES ---
+        if is_admin:
+            if msg.startswith("!setwelcome ") and len(args) > 1:
+                self.welcome_message = " ".join(args[1:])
+                await self.highrise.chat("✅ Bienvenida actualizada.")
+            elif msg == "!resetwelcome":
+                self.welcome_message = "Bienvenido/a a la sala."
+                await self.highrise.chat("✅ Bienvenida reseteada.")
+            elif msg.startswith("!setpromotext ") and len(args) > 1:
+                self.promo_message = " ".join(args[1:])
+                await self.highrise.chat("✅ Anuncio actualizado.")
+            elif msg == "!resetpromo":
+                self.promo_message = ""
+                await self.highrise.chat("✅ Anuncio vaciado.")
+            elif msg.startswith("!setpromotime ") and len(args) > 1 and args[1].isdigit():
+                minutes = int(args[1])
+                self.promo_interval = max(60, minutes * 60)
+                await self.highrise.chat(f"⏰ Anuncio cada {minutes} min.")
+
+        # --- GESTIÓN VIP MANUAL ---
+        if is_admin:
+            if msg.startswith("!vip ") and len(args) > 1 and args[1] not in ["admin", "tp"]:
+                target = args[1].replace("@", "")
+                if target in self.vips:
+                    self.vips.remove(target)
+                    self.save_json_file("vips.json", self.vips)
+                    await self.highrise.chat(f"❌ @{target} ya no es VIP.")
+                else:
+                    self.vips.append(target)
+                    self.save_json_file("vips.json", self.vips)
+                    await self.highrise.chat(f"💎 @{target} ahora es VIP.")
+
+            elif msg == "!vips":
+                await self.highrise.send_whisper(user.id, f"📋 VIPs: {', '.join(self.vips) if self.vips else 'Ninguno'}")
+
+        # --- BUCLADOR DE EMOTES ---
+        if msg in ["!stop", "!stopdance"]:
+            if user.id in self.active_loops:
+                self.active_loops[user.id].cancel()
+                del self.active_loops[user.id]
+            await self.highrise.send_emote("idle-sleep", user.id)
+            return
+
+        if msg.isdigit():
+            num = int(msg)
+            if 1 <= num <= len(ALL_EMOTES):
+                await self.start_emote_loop(user.id, ALL_EMOTES[num - 1])
+                return
+
+    async def start_emote_loop(self, user_id: str, emote_id: str):
+        if user_id in self.active_loops:
+            self.active_loops[user_id].cancel()
+        task = asyncio.create_task(self.run_loop(user_id, emote_id))
+        self.active_loops[user_id] = task
+
+    async def run_loop(self, user_id: str, emote_id: str):
+        try:
+            while True:
+                await self.highrise.send_emote(emote_id, user_id)
+                await asyncio.sleep(9)
+        except asyncio.CancelledError:
+            pass
+
+if __name__ == "__main__":
+    from highrise.__main__ import main
+    while True:
+        try:
+            print("🤖 Servicio DJBot iniciado...")
+            main()
+        except Exception as e:
+            print(f"⚠️ Error de conexión: {e}")
+            time.sleep(5)
