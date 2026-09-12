@@ -5,7 +5,7 @@ import sys
 import os
 import time
 
-# --- REPOSITORIO DE EMOTES PARA EL BOT ---
+# --- REPOSITORIO DE EMOTES ---
 ALL_EMOTES = [
     "dance-tiktok8", "dance-singalong", "dance-russian", "dance-poptart", "dance-pennywise",
     "dance-macarena", "dance-weird", "emote-superpose", "emote-frog", "dance-shoppingcart",
@@ -28,7 +28,7 @@ ALL_EMOTES = [
     "emote-bow", "emote-think", "emote-peace", "emote-boxer", "dance-model", "dance-smooth"
 ]
 
-# MAPA DE REACCIONES FLOTANTES OFICIALES DE HIGHRISE
+# MAPA DE REACCIONES FLOTANTES OFICIALES
 REACTIONS = {
     "heart": "heart",
     "wink": "wink",
@@ -138,7 +138,7 @@ class AXIBot(BaseBot):
         is_owner = username_lower == self.owner.lower()
         is_admin = is_owner or username_lower in [a.lower() for a in self.admins]
 
-        # Anti-Spam
+        # Anti-Spam Cooldown
         current_time = time.time()
         if not is_admin:
             if user.id in self.user_cooldowns:
@@ -151,7 +151,7 @@ class AXIBot(BaseBot):
             await self.highrise.chat("🔄 Reiniciando el bot...")
             os.execv(sys.executable, ['python'] + sys.argv)
 
-        # Menús de Ayuda
+        # --- MENÚ PRINCIPAL DE AYUDA ---
         if msg in ["!ayuda", "!help", "/help"]:
             menu = (
                 "<color=#F2C94C>✨ Categorías de Comandos: ✨</color>\n\n"
@@ -159,28 +159,78 @@ class AXIBot(BaseBot):
                 "🚀 <color=#7CB9E8>/help tp</color>\n"
                 "❤️ <color=#A892EE>/help react</color>\n"
                 "💬 <color=#00FFFF>/help messages</color>\n"
-                "🛡️ <color=#FF7F50>/help mod</color>"
+                "🛡️ <color=#FF7F50>/help mod</color>\n"
+                "⚙️ <color=#FF4500>/help admin</color>"
             )
             await self.highrise.send_whisper(user.id, menu)
             return
 
-        if msg in ["/help react", "!help react"]:
-            text = "❤️ <color=#A892EE>**REACCIONES FLOTANTES**</color>\n• !heart @user\n• !wink @user\n• !wave @user\n• !clap @user\n• !thumbs @user"
-            await self.highrise.send_whisper(user.id, text)
-            return
-
-        if msg in ["/help messages", "!help messages"] and is_admin:
+        # --- SUBMENÚS DE AYUDA ---
+        if msg in ["/help emotes", "!help emotes", "/help emote", "!help emote"]:
             text = (
-                "💬 <color=#00FFFF>**CONFIGURACIÓN DE MENSAJES**</color>\n"
-                "• !setwelcome <texto> - Cambia bienvenida.\n"
-                "• !setpromotext <texto> - Cambia anuncio.\n"
-                "• !setpromotime <min> - Minutos entre anuncios.\n"
-                "• !promoon / !promooff - Activa/Desactiva anuncios."
+                "💃 <color=#E282B7>**COMANDOS DE EMOTES**</color>\n"
+                "• Escribe el número directo del 1 al 100 para bailar en bucle.\n"
+                "• Escribe <color=#FF4500>!stop</color> para detener el baile."
             )
             await self.highrise.send_whisper(user.id, text)
             return
 
-        # Configuración de Mensajes
+        if msg in ["/help tp", "!help tp"]:
+            text = (
+                "🚀 <color=#7CB9E8>**COMANDOS DE TELETRANSPORTE**</color>\n"
+                "• !vip - Teletransporte a la zona VIP (Solo Miembros VIP).\n"
+                "• !bar / !dj / !piso2 - Puntos TP guardados en la sala."
+            )
+            await self.highrise.send_whisper(user.id, text)
+            return
+
+        if msg in ["/help react", "!help react"]:
+            text = (
+                "❤️ <color=#A892EE>**REACCIONES FLOTANTES**</color>\n"
+                "• !heart [@user] - Envía un corazón flotante.\n"
+                "• !wink [@user] - Envía un guiño.\n"
+                "• !wave [@user] - Envía un saludo con la mano.\n"
+                "• !clap [@user] - Envía un aplauso.\n"
+                "• !thumbs [@user] - Envía pulgar arriba."
+            )
+            await self.highrise.send_whisper(user.id, text)
+            return
+
+        if msg in ["/help messages", "!help messages"]:
+            if is_admin:
+                text = (
+                    "💬 <color=#00FFFF>**CONFIGURACIÓN DE MENSAJES**</color>\n"
+                    "• !setwelcome <texto> - Cambia bienvenida.\n"
+                    "• !setpromotext <texto> - Cambia mensaje del anuncio.\n"
+                    "• !setpromotime <minutos> - Tiempo entre anuncios.\n"
+                    "• !promoon / !promooff - Enciende o apaga los anuncios."
+                )
+                await self.highrise.send_whisper(user.id, text)
+            return
+
+        if msg in ["/help mod", "!help mod"]:
+            if is_admin:
+                text = (
+                    "🛡️ <color=#FF7F50>**COMANDOS DE MODERACIÓN**</color>\n"
+                    "• !kick @usuario - Expulsa un usuario de la sala.\n"
+                    "• !vip @usuario - Otorga o quita VIP manualmente.\n"
+                    "• !vips - Muestra la lista de usuarios VIP guardados."
+                )
+                await self.highrise.send_whisper(user.id, text)
+            return
+
+        if msg in ["/help admin", "!help admin"]:
+            if is_admin:
+                text = (
+                    "⚙️ <color=#FF4500>**COMANDOS DE ADMINISTRACIÓN**</color>\n"
+                    "• !set <zona> - Guarda el punto TP actual (ej: !set bar, !set vip).\n"
+                    "• !tpbot - Trae al bot a tu posición actual.\n"
+                    "• !restart - Reinicia el bot por completo."
+                )
+                await self.highrise.send_whisper(user.id, text)
+            return
+
+        # --- CONFIGURACIÓN DE MENSAJES DESDE EL CHAT ---
         if is_admin:
             if msg.startswith("!setwelcome ") and len(args) > 1:
                 self.welcome_message = " ".join(args[1:])
@@ -206,15 +256,15 @@ class AXIBot(BaseBot):
                 if self.promo_task: self.promo_task.cancel()
                 await self.highrise.chat("🛑 Anuncios automáticos desactivados.")
 
-        # REACCIONES FLOTANTES SOBRE EL JUGADOR (react)
+        # --- REACCIONES FLOTANTES (react) ---
         if msg.startswith(("!heart", "!wink", "!wave", "!clap", "!thumbs")):
             cmd = msg.split()[0][1:]
             reaction_type = REACTIONS.get(cmd)
             
             if reaction_type:
                 target_user_id = user.id
-                target_name = user.username
-
+                
+                # Si se etiquetó a alguien, buscar a esa persona
                 if len(args) > 1:
                     target_search = args[1].replace("@", "").lower()
                     try:
@@ -222,17 +272,16 @@ class AXIBot(BaseBot):
                         for u, _ in room_users:
                             if u.username.lower() == target_search:
                                 target_user_id = u.id
-                                target_name = u.username
                                 break
                     except Exception as e:
-                        print(f"Error buscando usuario: {e}")
+                        print(f"Error buscando usuario para reacción: {e}")
 
                 try:
                     await self.highrise.react(reaction_type, target_user_id)
                 except Exception as e:
                     print(f"Error enviando reacción: {e}")
 
-        # Emotes en Bucle
+        # --- EMOTES EN BUCLE ---
         if msg in ["!stop", "!stopdance"]:
             if user.id in self.active_loops:
                 self.active_loops[user.id].cancel()
@@ -246,7 +295,7 @@ class AXIBot(BaseBot):
                 await self.start_emote_loop(user.id, ALL_EMOTES[num - 1])
                 return
 
-        # Puntos TP Protegidos contra Bucle
+        # --- PUNTOS TP PROTEGIDOS ---
         if is_admin and msg.startswith("!set ") and len(args) > 1:
             zone = args[1].lower()
             try:
@@ -256,11 +305,23 @@ class AXIBot(BaseBot):
                         self.locations[zone] = pos
                         if zone == "vip": self.vip_zone_pos = pos
                         await self.highrise.chat(f"📍 Punto '{zone}' guardado con éxito.")
-                        break  # <--- Evita el spam/crash de la última vez
+                        break
             except Exception as e:
                 print(f"Error set: {e}")
 
-        # Comandos de Gestión VIP
+        # --- TELETRANSPORTE A PUNTOS GUARDADOS ---
+        if msg.startswith("!"):
+            zone_cmd = msg[1:]
+            if zone_cmd in self.locations:
+                if zone_cmd == "vip" and not is_admin and username_lower not in [v.lower() for v in self.vips]:
+                    await self.highrise.send_whisper(user.id, "⛔ Necesitas ser VIP para ir a esta zona.")
+                    return
+                try:
+                    await self.highrise.teleport(user.id, self.locations[zone_cmd])
+                except Exception as e:
+                    print(f"Error TP: {e}")
+
+        # --- GESTIÓN MANUAL DE VIPS ---
         if is_admin:
             if msg.startswith("!vip ") and len(args) > 1 and args[1] not in ["admin", "tp"]:
                 target = args[1].replace("@", "")
@@ -290,7 +351,7 @@ class AXIBot(BaseBot):
         except asyncio.CancelledError:
             pass
 
-# BUCLE DE INICIO Y RECONEXIÓN AUTOMÁTICA
+# BUCLE DE AUTO-RECONEXIÓN
 if __name__ == "__main__":
     from highrise.__main__ import main
     while True:
