@@ -142,9 +142,8 @@ class AXIBot(BaseBot):
 
         # Flash TP sólo en cambios verticales (eje Y)
         if self.flash_enabled:
-            # Si se detecta un cambio vertical mayor a 1.5 bloques respecto a una posición base
-            if abs(pos.y - getattr(user, 'last_y', pos.y)) > 1.5:
-                # Evitar TP a zona VIP si no es VIP
+            last_y = getattr(user, 'last_y', pos.y)
+            if abs(pos.y - last_y) > 1.5:
                 if self.vip_zone_pos and not is_vip:
                     vip_pos = Position(self.vip_zone_pos['x'], self.vip_zone_pos['y'], self.vip_zone_pos['z'])
                     if abs(pos.y - vip_pos.y) < 2.0:
@@ -426,4 +425,7 @@ class AXIBot(BaseBot):
 
         # --- BUCLADOR DE EMOTES ---
         if msg in ["!stop", "!stopdance"]:
-            if user.id in 
+            if user.id in self.active_loops:
+                self.active_loops[user.id].cancel()
+                del self.active_loops[user.id]
+  
