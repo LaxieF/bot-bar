@@ -1,12 +1,11 @@
 from highrise import BaseBot, Position, User, CurrencyItem
-from highrise.models import Reaction
 import asyncio
 import json
 import sys
 import os
 import time
 
-# --- REPOSITORIO DE EMOTES ---
+# --- REPOSITORIO DE EMOTES PARA EL BOT ---
 ALL_EMOTES = [
     "dance-tiktok8", "dance-singalong", "dance-russian", "dance-poptart", "dance-pennywise",
     "dance-macarena", "dance-weird", "emote-superpose", "emote-frog", "dance-shoppingcart",
@@ -29,17 +28,13 @@ ALL_EMOTES = [
     "emote-bow", "emote-think", "emote-peace", "emote-boxer", "dance-model", "dance-smooth"
 ]
 
-TIP_BARS = {
-    1: "gold_bar_1", 5: "gold_bar_5", 10: "gold_bar_10",
-    50: "gold_bar_50", 100: "gold_bar_100", 500: "gold_bar_500"
-}
-
+# MAPA DE REACCIONES FLOTANTES OFICIALES DE HIGHRISE
 REACTIONS = {
-    "heart": Reaction.Heart,
-    "wink": Reaction.Wink,
-    "wave": Reaction.Wave,
-    "clap": Reaction.Clap,
-    "thumbs": Reaction.ThumbsUp
+    "heart": "heart",
+    "wink": "wink",
+    "wave": "wave",
+    "clap": "clap",
+    "thumbs": "thumbs"
 }
 
 class AXIBot(BaseBot):
@@ -49,13 +44,13 @@ class AXIBot(BaseBot):
         self.owner = "LaxieF"
         self.admins = []
         
-        # Carga automática de VIPs guardados previamente en disco
+        # VIPs persistentes guardados en disco
         self.vips = self.load_vips()
         
-        # MENSAJES EDITABLES
+        # MENSAJES PERSONALIZABLES
         self.welcome_message = "Bienvenido/a a Drunk Bar 🍺 Escribe !ayuda o !help."
         self.promo_message = "🌟 ¡Consigue acceso VIP permanente enviando una propina de 500g al bot!"
-        self.promo_interval = 300  # Segundos (5 min)
+        self.promo_interval = 300  # 5 minutos
         self.promo_active = True
         self.promo_task = None
         
@@ -63,42 +58,35 @@ class AXIBot(BaseBot):
         self.vip_zone_pos = None
         self.vip_radius = 3.0
         self.spawn_pos = None
-        self.default_bot_pos = None
         
-        self.flash_users = set()
-        self.user_positions = {}
         self.active_loops = {}
-        
-        self.following_user_id = None
-        
-        # CONTROL ANTI-SPAM
         self.user_cooldowns = {}
         self.cooldown_time = 2.0
 
-    # --- FUNCIONES DE LECTURA Y ESCRITURA VIP EN ARCHIVO ---
+    # Carga y guardado de VIPs en disco
     def load_vips(self):
         try:
             if os.path.exists("vips.json"):
                 with open("vips.json", "r") as f:
                     data = json.load(f)
-                    print(f"📂 Lista VIP cargada correctamente: {len(data)} miembros.")
+                    print(f"📂 Lista VIP cargada: {len(data)} miembros.")
                     return data
             return []
         except Exception as e:
-            print(f"Error al cargar vips.json: {e}")
+            print(f"Error cargando VIPs: {e}")
             return []
 
     def save_vips(self):
         try:
             with open("vips.json", "w") as f:
                 json.dump(self.vips, f)
-            print("💾 Lista VIP guardada en vips.json")
+            print("💾 Lista VIP guardada con éxito.")
         except Exception as e:
-            print(f"Error al guardar vips.json: {e}")
+            print(f"Error guardando VIPs: {e}")
 
     async def on_start(self, session_metadata) -> None:
         self.bot_id = session_metadata.user_id
-        print(f"🎧 DJBot conectado y listo.")
+        print(f"🎧 DJBot conectado y listo para la música.")
         if self.promo_active:
             self.promo_task = asyncio.create_task(self.run_promo_loop())
 
@@ -110,37 +98,22 @@ class AXIBot(BaseBot):
         except Exception as e:
             print(f"Error bienvenida: {e}")
 
-    # --- DETECCION Y REGISTRO DE PROPINAS ---
+    # Pago VIP por propina directa
     async def on_tip(self, sender: User, receiver: User, tip: CurrencyItem) -> None:
         if receiver.id == self.bot_id:
-            # Imprime evidencia imborrable en la consola de Render
-            print(f"💰 [EVIDENCIA PROPINA] @{sender.username} envió {tip.amount}g de oro.")
-            
+            print(f"💰 [PROPINA] @{sender.username} envió {tip.amount}g de oro.")
             await self.highrise.chat(f"🎉 ¡Gracias @{sender.username} por la propina de {tip.amount}g de oro! 🪙")
             
             if tip.amount >= 500:
                 if sender.username not in self.vips:
                     self.vips.append(sender.username)
-                    self.save_vips()  # <--- Guarda el VIP en el disco
+                    self.save_vips()
                     await self.highrise.chat(f"💎 ¡Felicidades @{sender.username}! Ahora eres miembro VIP permanente.")
 
     async def on_user_move(self, user: User, pos: Position) -> None:
         username_lower = user.username.lower()
 
-        if self.following_user_id and user.id == self.following_user_id:
-            try:
-                await self.highrise.walk_to(Position(pos.x, pos.y, pos.z, getattr(pos, 'facing', 'FrontRight')))
-            except Exception:
-                pass
-
-        if user.id in self.flash_users:
-            old_pos = self.user_positions.get(user.id)
-            if old_pos and hasattr(pos, 'y') and hasattr(old_pos, 'y'):
-                if abs(pos.y - old_pos.y) >= 1.5:
-                    await self.highrise.teleport(user.id, Position(pos.x, pos.y, pos.z, getattr(pos, 'facing', 'FrontRight')))
-            self.user_positions[user.id] = pos
-
-        # Control de zona VIP
+        # Restricción de Zona VIP
         if self.vip_zone_pos and username_lower != self.owner.lower() and username_lower not in [a.lower() for a in self.admins] and username_lower not in [v.lower() for v in self.vips]:
             dx, dy, dz = pos.x - self.vip_zone_pos.x, pos.y - self.vip_zone_pos.y, pos.z - self.vip_zone_pos.z
             if (dx*dx + dy*dy + dz*dz) <= (self.vip_radius * self.vip_radius):
@@ -165,7 +138,7 @@ class AXIBot(BaseBot):
         is_owner = username_lower == self.owner.lower()
         is_admin = is_owner or username_lower in [a.lower() for a in self.admins]
 
-        # Filtro Anti-Spam por Cooldown
+        # Anti-Spam
         current_time = time.time()
         if not is_admin:
             if user.id in self.user_cooldowns:
@@ -173,7 +146,7 @@ class AXIBot(BaseBot):
                     return
             self.user_cooldowns[user.id] = current_time
 
-        # Reinicio Manual
+        # Reiniciar Bot
         if msg in ["!restart", "!reiniciar"] and is_owner:
             await self.highrise.chat("🔄 Reiniciando el bot...")
             os.execv(sys.executable, ['python'] + sys.argv)
@@ -184,34 +157,26 @@ class AXIBot(BaseBot):
                 "<color=#F2C94C>✨ Categorías de Comandos: ✨</color>\n\n"
                 "💃 <color=#E282B7>/help emotes</color>\n"
                 "🚀 <color=#7CB9E8>/help tp</color>\n"
-                "🎮 <color=#A892EE>/help fun</color>\n"
-                "🪙 <color=#F2C94C>/help gold</color>\n"
+                "❤️ <color=#A892EE>/help react</color>\n"
                 "💬 <color=#00FFFF>/help messages</color>\n"
-                "🛡️ <color=#FF7F50>/help mod</color>\n"
-                "⚙️ <color=#FF4500>/help admin</color>"
+                "🛡️ <color=#FF7F50>/help mod</color>"
             )
             await self.highrise.send_whisper(user.id, menu)
             return
 
-        if msg in ["/help messages", "!help messages"]:
-            if is_admin:
-                text = (
-                    "💬 <color=#00FFFF>**CONFIGURACIÓN DE MENSAJES**</color>\n"
-                    "• !setwelcome <texto> - Cambia bienvenida.\n"
-                    "• !setpromotext <texto> - Cambia anuncio.\n"
-                    "• !setpromotime <min> - Minutos entre anuncios.\n"
-                    "• !promoon / !promooff - Activa/Desactiva anuncios."
-                )
-                await self.highrise.send_whisper(user.id, text)
-            return
-
-        if msg in ["!ayuda emotes", "!help emotes", "/help emotes"]:
-            text = "💃 <color=#E282B7>**EMOTES MENU**</color>\n• !emotes [pág 1-8]\n• Escribe el número directo (1 al 100) para bailar en bucle.\n• Escribe !stop para detenerte."
+        if msg in ["/help react", "!help react"]:
+            text = "❤️ <color=#A892EE>**REACCIONES FLOTANTES**</color>\n• !heart @user\n• !wink @user\n• !wave @user\n• !clap @user\n• !thumbs @user"
             await self.highrise.send_whisper(user.id, text)
             return
 
-        if msg in ["!ayuda fun", "!help fun", "/help fun"]:
-            text = "🎮 <color=#A892EE>**REACCIONES DIVERTIDAS**</color>\n• !heart @user\n• !wink @user\n• !wave @user\n• !clap @user\n• !thumbs @user"
+        if msg in ["/help messages", "!help messages"] and is_admin:
+            text = (
+                "💬 <color=#00FFFF>**CONFIGURACIÓN DE MENSAJES**</color>\n"
+                "• !setwelcome <texto> - Cambia bienvenida.\n"
+                "• !setpromotext <texto> - Cambia anuncio.\n"
+                "• !setpromotime <min> - Minutos entre anuncios.\n"
+                "• !promoon / !promooff - Activa/Desactiva anuncios."
+            )
             await self.highrise.send_whisper(user.id, text)
             return
 
@@ -241,28 +206,31 @@ class AXIBot(BaseBot):
                 if self.promo_task: self.promo_task.cancel()
                 await self.highrise.chat("🛑 Anuncios automáticos desactivados.")
 
-        # Reacciones Directas Flotantes
+        # REACCIONES FLOTANTES SOBRE EL JUGADOR (react)
         if msg.startswith(("!heart", "!wink", "!wave", "!clap", "!thumbs")):
             cmd = msg.split()[0][1:]
             reaction_type = REACTIONS.get(cmd)
             
-            target_user_id = user.id
-            target_name = user.username
+            if reaction_type:
+                target_user_id = user.id
+                target_name = user.username
 
-            if len(args) > 1:
-                target_search = args[1].replace("@", "").lower()
-                room_users = (await self.highrise.get_room_users()).content
-                for u, _ in room_users:
-                    if u.username.lower() == target_search:
-                        target_user_id = u.id
-                        target_name = u.username
-                        break
+                if len(args) > 1:
+                    target_search = args[1].replace("@", "").lower()
+                    try:
+                        room_users = (await self.highrise.get_room_users()).content
+                        for u, _ in room_users:
+                            if u.username.lower() == target_search:
+                                target_user_id = u.id
+                                target_name = u.username
+                                break
+                    except Exception as e:
+                        print(f"Error buscando usuario: {e}")
 
-            try:
-                await self.highrise.react(reaction_type, target_user_id)
-                await self.highrise.chat(f"✨ @{user.username} le envió {cmd} a @{target_name}")
-            except Exception as e:
-                print(f"Error reacción: {e}")
+                try:
+                    await self.highrise.react(reaction_type, target_user_id)
+                except Exception as e:
+                    print(f"Error enviando reacción: {e}")
 
         # Emotes en Bucle
         if msg in ["!stop", "!stopdance"]:
@@ -278,7 +246,7 @@ class AXIBot(BaseBot):
                 await self.start_emote_loop(user.id, ALL_EMOTES[num - 1])
                 return
 
-        # Puntos TP protegidos contra bucles
+        # Puntos TP Protegidos contra Bucle
         if is_admin and msg.startswith("!set ") and len(args) > 1:
             zone = args[1].lower()
             try:
@@ -288,11 +256,11 @@ class AXIBot(BaseBot):
                         self.locations[zone] = pos
                         if zone == "vip": self.vip_zone_pos = pos
                         await self.highrise.chat(f"📍 Punto '{zone}' guardado con éxito.")
-                        break  # <--- Evita duplicados y bucles
+                        break  # <--- Evita el spam/crash de la última vez
             except Exception as e:
                 print(f"Error set: {e}")
 
-        # Administración manual de VIPs
+        # Comandos de Gestión VIP
         if is_admin:
             if msg.startswith("!vip ") and len(args) > 1 and args[1] not in ["admin", "tp"]:
                 target = args[1].replace("@", "")
@@ -322,7 +290,7 @@ class AXIBot(BaseBot):
         except asyncio.CancelledError:
             pass
 
-# --- AUTO-RECONEXIÓN AUTOMÁTICA EN BUCLE ---
+# BUCLE DE INICIO Y RECONEXIÓN AUTOMÁTICA
 if __name__ == "__main__":
     from highrise.__main__ import main
     while True:
