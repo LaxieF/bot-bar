@@ -1,6 +1,5 @@
 from highrise import BaseBot, Position, User, CurrencyItem
 import asyncio
-import json
 import sys
 import os
 import time
@@ -43,12 +42,12 @@ class AXIBot(BaseBot):
         self.owner = "LaxieF"
         self.admins = []
         
-        # Archivos de persistencia
-        self.vips = self.load_json_file("vips.json", [])
-        self.bot_fixed_pos = self.load_json_file("bot_pos.json", None)
-        self.locations = self.load_json_file("locations.json", {})
+        # Guardado en Memoria (Evita crash de escritura en disco Render)
+        self.vips = []
+        self.bot_fixed_pos = None
+        self.locations = {}
         
-        # Mutes y rastreo de posición vertical seguro
+        # Mutes y rastreo de posición vertical
         self.muted_users = {}
         self.user_last_y = {}
         
@@ -66,7 +65,7 @@ class AXIBot(BaseBot):
         self.promo_active = True
         self.promo_task = None
         
-        self.vip_zone_pos = self.locations.get("vip", None)
+        self.vip_zone_pos = None
         self.vip_radius = 3.0
         self.spawn_pos = None
         
@@ -74,28 +73,10 @@ class AXIBot(BaseBot):
         self.user_cooldowns = {}
         self.cooldown_time = 2.0
 
-    def load_json_file(self, filename, default_val):
-        try:
-            if os.path.exists(filename):
-                with open(filename, "r") as f:
-                    return json.load(f)
-            return default_val
-        except Exception as e:
-            print(f"Error cargando {filename}: {e}")
-            return default_val
-
-    def save_json_file(self, filename, data):
-        try:
-            with open(filename, "w") as f:
-                json.dump(data, f)
-        except Exception as e:
-            print(f"Error guardando {filename}: {e}")
-
     async def on_start(self, session_metadata) -> None:
         self.bot_id = session_metadata.user_id
         print(f"🎧 DJBot conectado y listo.")
         
-        # Posición fija del bot al iniciar
         if self.bot_fixed_pos:
             try:
                 pos = Position(self.bot_fixed_pos['x'], self.bot_fixed_pos['y'], self.bot_fixed_pos['z'])
@@ -122,8 +103,7 @@ class AXIBot(BaseBot):
             if tip.amount >= 500:
                 if sender.username not in self.vips:
                     self.vips.append(sender.username)
-                    self.save_json_file("vips.json", self.vips)
-                    await self.highrise.chat(f"💎 ¡Felicidades @{sender.username}! Ahora eres miembro VIP permanente.")
+                    await self.highrise.chat(f"💎 ¡Felicidades @{sender.username}! Ahora eres miembro VIP.")
 
     async def on_user_move(self, user: User, pos: Position) -> None:
         username_lower = user.username.lower()
@@ -309,7 +289,7 @@ class AXIBot(BaseBot):
                 except Exception as e:
                     print(f"Error en reacción {cmd}: {e}")
 
-        # --- NUEVOS COMANDOS AVANZADOS DE TELETRANSPORTE ---
+        # --- COMANDOS AVANZADOS DE TELETRANSPORTE ---
         if msg in ["!tpbot", "!comebot"] and is_admin:
             room_users = (await self.highrise.get_room_users()).content
             for u, pos in room_users:
@@ -352,7 +332,6 @@ class AXIBot(BaseBot):
             for u, pos in room_users:
                 if u.id == user.id:
                     self.bot_fixed_pos = {'x': pos.x, 'y': pos.y, 'z': pos.z}
-                    self.save_json_file("bot_pos.json", self.bot_fixed_pos)
                     await self.highrise.chat("📍 Posición fija del bot actualizada.")
                     break
 
@@ -402,16 +381,14 @@ class AXIBot(BaseBot):
                 for u, pos in room_users:
                     if u.id == user.id:
                         self.locations[zone] = {'x': pos.x, 'y': pos.y, 'z': pos.z}
-                        self.save_json_file("locations.json", self.locations)
                         if zone == "vip": self.vip_zone_pos = self.locations[zone]
-                        await self.highrise.chat(f"📍 Punto '{zone}' guardado.")
+                        await self.highrise.chat(f"📍 Punto '{zone}' guardado correctamente.")
                         break
 
             elif msg.startswith("!del ") and len(args) > 1:
                 zone = args[1].lower()
                 if zone in self.locations:
                     del self.locations[zone]
-                    self.save_json_file("locations.json", self.locations)
                     if zone == "vip": self.vip_zone_pos = None
                     await self.highrise.chat(f"🗑️ Punto '{zone}' eliminado.")
 
@@ -451,69 +428,4 @@ class AXIBot(BaseBot):
                 self.welcome_message = " ".join(args[1:])
                 await self.highrise.chat("✅ Bienvenida actualizada.")
             elif msg == "!resetwelcome":
-                self.welcome_message = "Bienvenido/a a la sala."
-                await self.highrise.chat("✅ Bienvenida reseteada.")
-            elif msg.startswith("!setpromotext ") and len(args) > 1:
-                self.promo_message = " ".join(args[1:])
-                await self.highrise.chat("✅ Anuncio actualizado.")
-            elif msg == "!resetpromo":
-                self.promo_message = ""
-                await self.highrise.chat("✅ Anuncio vaciado.")
-            elif msg.startswith("!setpromotime ") and len(args) > 1 and args[1].isdigit():
-                minutes = int(args[1])
-                self.promo_interval = max(60, minutes * 60)
-                await self.highrise.chat(f"⏰ Anuncio cada {minutes} min.")
-
-        # --- GESTIÓN VIP MANUAL ---
-        if is_admin:
-            if msg.startswith("!vip ") and len(args) > 1 and args[1] not in ["admin", "tp"]:
-                target = args[1].replace("@", "")
-                if target in self.vips:
-                    self.vips.remove(target)
-                    self.save_json_file("vips.json", self.vips)
-                    await self.highrise.chat(f"❌ @{target} ya no es VIP.")
-                else:
-                    self.vips.append(target)
-                    self.save_json_file("vips.json", self.vips)
-                    await self.highrise.chat(f"💎 @{target} ahora es VIP.")
-
-            elif msg == "!vips":
-                await self.highrise.send_whisper(user.id, f"📋 VIPs: {', '.join(self.vips) if self.vips else 'Ninguno'}")
-
-        # --- BUCLADOR DE EMOTES ---
-        if msg in ["!stop", "!stopdance"]:
-            if user.id in self.active_loops:
-                self.active_loops[user.id].cancel()
-                del self.active_loops[user.id]
-            await self.highrise.send_emote("idle-sleep", user.id)
-            return
-
-        if msg.isdigit():
-            num = int(msg)
-            if 1 <= num <= len(ALL_EMOTES):
-                await self.start_emote_loop(user.id, ALL_EMOTES[num - 1])
-                return
-
-    async def start_emote_loop(self, user_id: str, emote_id: str):
-        if user_id in self.active_loops:
-            self.active_loops[user_id].cancel()
-        task = asyncio.create_task(self.run_loop(user_id, emote_id))
-        self.active_loops[user_id] = task
-
-    async def run_loop(self, user_id: str, emote_id: str):
-        try:
-            while True:
-                await self.highrise.send_emote(emote_id, user_id)
-                await asyncio.sleep(9)
-        except asyncio.CancelledError:
-            pass
-
-if __name__ == "__main__":
-    from highrise.__main__ import main
-    while True:
-        try:
-            print("🤖 Servicio DJBot iniciado...")
-            main()
-        except Exception as e:
-            print(f"⚠️ Error de conexión: {e}")
-            time.sleep(5)
+                self.
