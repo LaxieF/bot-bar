@@ -1,4 +1,5 @@
 import os
+import requests
 from highrise import BaseBot, Position
 
 class DJBot(BaseBot):
@@ -11,29 +12,27 @@ class DJBot(BaseBot):
         print("🎧 DJBot conectado y listo para la música.", flush=True)
 
     async def on_chat(self, user, message: str) -> None:
-        msg = message.strip().lower()
+        msg = message.strip()
+        msg_lower = msg.lower()
 
-        if msg == "!play":
-            await self.highrise.chat("🎶 ¡Poniendo la música!")
-            
-        elif msg == "!tpdj":
+        if msg_lower.startswith("!play "):
+            busqueda = msg[6:].strip()
+            await self.highrise.chat(f"🎶 Buscando: {busqueda}")
+            try:
+                requests.post("http://18.222.194.165:5000/play", json={"query": busqueda}, timeout=5)
+            except Exception as e:
+                print(f"Error conectando a VPS: {e}", flush=True)
+
+        elif msg_lower == "!tpdj":
             try:
                 room_users = (await self.highrise.get_room_users()).content
                 for u, pos in room_users:
                     if u.username.lower() == user.username.lower():
-                        x = getattr(pos, 'x', 0)
-                        y = getattr(pos, 'y', 0)
-                        z = getattr(pos, 'z', 0)
-                        facing = getattr(pos, 'facing', 'FrontRight')
+                        x = getattr(pos, "x", 0)
+                        y = getattr(pos, "y", 0)
+                        z = getattr(pos, "z", 0)
+                        facing = getattr(pos, "facing", "FrontRight")
                         await self.highrise.teleport(self.bot_id, Position(x, y, z, facing))
                         return
             except Exception as e:
                 print(f"Error TP DJBot: {e}", flush=True)
-
-if __name__ == "__main__":
-    ROOM_ID = "66137b812eb7852780780ace"
-    TOKEN ="d56c280270fa345592ce1ed994ae8ade013e9fa9c48ae744e03eef57278f87a0"
-    
-    # Inicia la conexión del DJ con Highrise
-    run(DJBot(), ROOM_ID, TOKEN)
-        
