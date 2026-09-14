@@ -2,6 +2,19 @@ import os
 import asyncio
 import requests
 from highrise import BaseBot, Position
+from flask import Flask
+from threading import Thread
+
+# Mini servidor web obligatorio para que Render no apague el bot
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "DJBot está activo"
+
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
 
 class DJBot(BaseBot):
     def __init__(self):
@@ -27,8 +40,6 @@ class DJBot(BaseBot):
                     lambda: requests.post("http://18.222.194.165:5000/play", json={"query": busqueda}, timeout=30)
                 )
                 
-                print(f"Respuesta del servidor Flask: {response.status_code} - {response.text}", flush=True)
-
                 if response.status_code == 200:
                     data = response.json()
                     titulo = data.get("title", "Audio")
@@ -36,10 +47,10 @@ class DJBot(BaseBot):
                     
                     await self.highrise.chat(f"▶️ Reproduciendo: {titulo}")
                 else:
-                    await self.highrise.chat(f"❌ Error del servidor: {response.status_code}")
+                    await self.highrise.chat("❌ No se pudo procesar la canción.")
                     
             except Exception as e:
-                print(f"Excepción crítica conectando a VPS: {e}", flush=True)
+                print(f"Error conectando a VPS: {e}", flush=True)
                 await self.highrise.chat("⚠️ Error de conexión con el servidor de música.")
 
         elif msg_lower == "!tpdj":
@@ -55,4 +66,9 @@ class DJBot(BaseBot):
                         return
             except Exception as e:
                 print(f"Error TP DJBot: {e}", flush=True)
-                
+
+# Arrancamos el servidor web en segundo plano para engañar a Render
+if __name__ == "__main__":
+    t = Thread(target=run_web)
+    t.daemon = True
+    t.start()
