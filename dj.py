@@ -21,7 +21,6 @@ class DJBot(BaseBot):
             await self.highrise.chat(f"🎶 Buscando: {busqueda}")
             
             try:
-                # Ejecutamos la petición en un hilo secundario para no congelar el bot (Timeout ampliado a 30s)
                 loop = asyncio.get_running_loop()
                 response = await loop.run_in_executor(
                     None, 
