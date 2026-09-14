@@ -21,11 +21,11 @@ class DJBot(BaseBot):
             await self.highrise.chat(f"🎶 Buscando: {busqueda}")
             
             try:
-                # Ejecutamos la petición en un hilo secundario para no congelar el bot
+                # Ejecutamos la petición en un hilo secundario para no congelar el bot (Timeout ampliado a 30s)
                 loop = asyncio.get_running_loop()
                 response = await loop.run_in_executor(
                     None, 
-                    lambda: requests.post("http://18.222.194.165:5000/play", json={"query": busqueda}, timeout=10)
+                    lambda: requests.post("http://18.222.194.165:5000/play", json={"query": busqueda}, timeout=30)
                 )
                 
                 if response.status_code == 200:
@@ -35,7 +35,6 @@ class DJBot(BaseBot):
                     
                     await self.highrise.chat(f"▶️ Reproduciendo: {titulo}")
                     print(f"URL de streaming obtenida: {url_streaming}", flush=True)
-                    # AQUÍ iría el código de reproducción de audio de tu bot hacia Highrise (si aplica)
                 else:
                     await self.highrise.chat("❌ No se pudo procesar la canción.")
                     
