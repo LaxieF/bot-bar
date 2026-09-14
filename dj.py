@@ -5,7 +5,7 @@ from highrise import BaseBot, Position
 from flask import Flask
 from threading import Thread
 
-# Mini servidor web obligatorio para que Render no apague el bot
+# Mini servidor web obligatorio para que Render mantenga el bot encendido
 app = Flask('')
 
 @app.route('/')
@@ -31,6 +31,10 @@ class DJBot(BaseBot):
 
         if msg_lower.startswith("!play "):
             busqueda = msg[6:].strip()
+            if not busqueda:
+                await self.highrise.chat("⚠️ Por favor escribe el nombre de una canción o artista después de !play")
+                return
+
             await self.highrise.chat(f"🎶 Buscando: {busqueda}")
             
             try:
@@ -45,9 +49,12 @@ class DJBot(BaseBot):
                     titulo = data.get("title", "Audio")
                     url_streaming = data.get("url")
                     
-                    await self.highrise.chat(f"▶️ Reproduciendo: {titulo}")
+                    if url_streaming:
+                        await self.highrise.chat(f"▶️ Reproduciendo: {titulo}")
+                    else:
+                        await self.highrise.chat("❌ El servidor no devolvió una URL válida.")
                 else:
-                    await self.highrise.chat("❌ No se pudo procesar la canción.")
+                    await self.highrise.chat("❌ No se pudo procesar la canción en el servidor.")
                     
             except Exception as e:
                 print(f"Error conectando a VPS: {e}", flush=True)
@@ -67,7 +74,7 @@ class DJBot(BaseBot):
             except Exception as e:
                 print(f"Error TP DJBot: {e}", flush=True)
 
-# Arrancamos el servidor web en segundo plano para engañar a Render
+# Arrancamos el servidor web en segundo plano para Render
 if __name__ == "__main__":
     t = Thread(target=run_web)
     t.daemon = True
