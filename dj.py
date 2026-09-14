@@ -27,18 +27,19 @@ class DJBot(BaseBot):
                     lambda: requests.post("http://18.222.194.165:5000/play", json={"query": busqueda}, timeout=30)
                 )
                 
+                print(f"Respuesta del servidor Flask: {response.status_code} - {response.text}", flush=True)
+
                 if response.status_code == 200:
                     data = response.json()
                     titulo = data.get("title", "Audio")
                     url_streaming = data.get("url")
                     
                     await self.highrise.chat(f"▶️ Reproduciendo: {titulo}")
-                    print(f"URL de streaming obtenida: {url_streaming}", flush=True)
                 else:
-                    await self.highrise.chat("❌ No se pudo procesar la canción.")
+                    await self.highrise.chat(f"❌ Error del servidor: {response.status_code}")
                     
             except Exception as e:
-                print(f"Error conectando a VPS: {e}", flush=True)
+                print(f"Excepción crítica conectando a VPS: {e}", flush=True)
                 await self.highrise.chat("⚠️ Error de conexión con el servidor de música.")
 
         elif msg_lower == "!tpdj":
@@ -54,3 +55,4 @@ class DJBot(BaseBot):
                         return
             except Exception as e:
                 print(f"Error TP DJBot: {e}", flush=True)
+                
